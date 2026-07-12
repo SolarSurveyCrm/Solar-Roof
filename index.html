@@ -118,7 +118,7 @@
     /* Animation สำหรับ Search Box */
     .search-box-content { transition: all 0.3s ease-in-out; transform-origin: top; }
     .search-box-hidden { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0 !important; }
-    .search-box-visible { max-height: 250px; opacity: 1; overflow: visible; }
+    .search-box-visible { max-height: 500px; opacity: 1; overflow: visible; }
 
     /* Custom Scrollbar สำหรับ List ภายใน Panel */
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -174,7 +174,7 @@
           <div id="tab-content-explore" class="space-y-5">
             
             <!-- Toggle Search Box -->
-            <div class="bg-white/80 border border-slate-200/80 rounded-2xl p-3.5 shadow-sm backdrop-blur-sm">
+            <div class="bg-white/80 border border-slate-200/80 rounded-2xl p-3.5 shadow-sm backdrop-blur-sm relative z-[100]">
               <div class="flex items-center justify-between cursor-pointer" onclick="toggleSearchBox()">
                 <label class="text-[13px] font-bold text-slate-700 tracking-wide flex items-center">
                   <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-2">
@@ -292,7 +292,7 @@
       <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <div class="bg-white/10 p-1.5 rounded-lg"><i class="fa-solid fa-floppy-disk text-amber-400"></i></div>
-          <h3 class="font-bold text-[15px] tracking-wide">บันทึกข้อมูลเข้าฐานระบบ CRM</h3>
+          <h3 id="modalTitleText" class="font-bold text-[15px] tracking-wide">บันทึกข้อมูลเข้าฐานระบบ CRM</h3>
         </div>
         <button type="button" class="text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center" onclick="closeCRMModal()">
           <i class="fa-solid fa-xmark text-lg"></i>
@@ -457,7 +457,8 @@
         id: t.id, lat: t.lat, lng: t.lng,
         companyName: t.companyName, address: t.address,
         roofArea: t.roofArea, isInsideRadius: t.isInsideRadius,
-        distance: t.distance, isSaved: t.isSaved, paybackYears: t.paybackYears
+        distance: t.distance, isSaved: t.isSaved, paybackYears: t.paybackYears,
+        contactPerson: t.contactPerson, phone: t.phone, status: t.status, notes: t.notes
       }));
       localStorage.setItem(LOCAL_STORAGE_TARGETS_KEY, JSON.stringify(dataToSave));
     }
@@ -842,9 +843,22 @@
       const budget = kwp * 0.03;
       const mapsLink = `https://www.google.com/maps/search/?api=1&query=${target.lat},${target.lng}`;
       
-      const badgeHTML = isSaved 
-        ? `<span class="bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0"><i class="fa-solid fa-check mr-0.5"></i> SAVED</span>` 
-        : `<span class="bg-amber-100 border border-amber-200 text-amber-700 text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0 animate-pulse">PENDING</span>`;
+      let badgeHTML = '';
+      let editBtn = '';
+      
+      if (isSaved) {
+         const statusStr = target.status || 'Lead-สนใจขั้นต้น';
+         let statusColor = 'bg-blue-100 text-blue-700 border-blue-200';
+         let statusIcon = 'fa-user';
+         if (statusStr.includes('Survey')) { statusColor = 'bg-purple-100 text-purple-700 border-purple-200'; statusIcon = 'fa-clipboard-list'; }
+         else if (statusStr.includes('Proposal')) { statusColor = 'bg-amber-100 text-amber-700 border-amber-200'; statusIcon = 'fa-file-invoice-dollar'; }
+         else if (statusStr.includes('Rejected')) { statusColor = 'bg-rose-100 text-rose-700 border-rose-200'; statusIcon = 'fa-xmark'; }
+         
+         badgeHTML = `<span class="${statusColor} text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0 border flex items-center"><i class="fa-solid ${statusIcon} mr-1"></i> ${statusStr.split('-')[0]}</span>`;
+         editBtn = `<button onclick="openCRMModal('${target.id}')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors" title="แก้ไขข้อมูล"><i class="fa-solid fa-pen-to-square text-[15px]"></i></button>`;
+      } else {
+         badgeHTML = `<span class="bg-amber-100 border border-amber-200 text-amber-700 text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0 animate-pulse">PENDING</span>`;
+      }
       
       return `
         <div class="p-3.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer transition-all mb-3" onclick="flyToTarget('${target.id}')">
@@ -858,6 +872,7 @@
           </div>
           <div class="flex items-center space-x-1" onclick="event.stopPropagation();">
             <a href="${mapsLink}" target="_blank" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="เปิดนำทาง Google Maps"><i class="fa-solid fa-map-location-dot text-[15px]"></i></a>
+            ${editBtn}
             <button onclick="deleteTargetMarker('${target.id}')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" title="ลบข้อมูล"><i class="fa-solid fa-trash-can text-[15px]"></i></button>
           </div>
         </div>
@@ -940,11 +955,26 @@
       currentTargetIdForCRM = id;
       document.getElementById('modalCoords').innerText = `${target.lat.toFixed(6)}, ${target.lng.toFixed(6)}`;
       document.getElementById('modalArea').innerText = `${target.roofArea.toFixed(1)} ตร.ม.`;
+      
+      // ดึงข้อมูลเดิมมาแสดงหากเป็นการแก้ไข
       document.getElementById('crmCompanyName').value = target.companyName || '';
       document.getElementById('crmAddress').value = target.address || '';
-      document.getElementById('crmContact').value = '';
-      document.getElementById('crmPhone').value = '';
-      document.getElementById('crmNotes').value = '';
+      document.getElementById('crmContact').value = target.contactPerson || '';
+      document.getElementById('crmPhone').value = target.phone || '';
+      document.getElementById('crmStatus').value = target.status || 'Lead-สนใจขั้นต้น';
+      document.getElementById('crmNotes').value = target.notes || '';
+      
+      const modalTitle = document.getElementById('modalTitleText');
+      const btnSubmitText = document.getElementById('btnSubmitCRM-Text');
+      
+      // ปรับคำใน Modal ให้เหมาะสม (บันทึกใหม่ หรือ แก้ไข)
+      if (target.isSaved) {
+         modalTitle.innerText = "แก้ไขข้อมูลระบบ CRM";
+         btnSubmitText.innerText = "อัปเดตข้อมูล";
+      } else {
+         modalTitle.innerText = "บันทึกข้อมูลเข้าฐานระบบ CRM";
+         btnSubmitText.innerText = "บันทึกเข้าฐานข้อมูล";
+      }
       
       const modal = document.getElementById('crmModal');
       modal.classList.remove('hidden');
@@ -967,12 +997,12 @@
       const btnSpinner = document.getElementById('btnSubmitCRM-Spinner');
       const btn = document.getElementById('btnSubmitCRM');
       
-      btn.disabled = true;
-      btnText.innerText = 'กำลังส่งข้อมูล...';
-      btnSpinner.classList.remove('hidden');
-      
       const target = targetMarkers.find(t => t.id === currentTargetIdForCRM);
       if (!target) return;
+      
+      btn.disabled = true;
+      btnText.innerText = target.isSaved ? 'กำลังอัปเดต...' : 'กำลังส่งข้อมูล...';
+      btnSpinner.classList.remove('hidden');
       
       const formData = {
         companyName: document.getElementById('crmCompanyName').value.trim(), address: document.getElementById('crmAddress').value.trim(),
@@ -980,29 +1010,43 @@
         phone: document.getElementById('crmPhone').value.trim(), status: document.getElementById('crmStatus').value, notes: document.getElementById('crmNotes').value.trim()
       };
 
+      // ฟังก์ชันสำหรับบันทึกข้อมูลลงตัวแปร Local
+      const applyDataToTargetLocally = () => {
+        target.companyName = formData.companyName || 'ไม่มีชื่อ';
+        target.address = formData.address || '-';
+        target.contactPerson = formData.contactPerson;
+        target.phone = formData.phone;
+        target.status = formData.status;
+        target.notes = formData.notes;
+        target.isSaved = true;
+      };
+
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function(response) {
-            btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+            btn.disabled = false; btnText.innerText = target.isSaved ? 'อัปเดตข้อมูล' : 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
             if (response.success) {
-              target.companyName = formData.companyName || 'ไม่มีชื่อ'; target.address = formData.address || '-';
-              target.isSaved = true; target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
+              applyDataToTargetLocally();
+              target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
               isTargetPending = false; updateSidebarList(); closeCRMModal(); saveStateToLocal();
-              showToast("🎉 บันทึกสำเร็จ!", "success");
+              showToast(target.isSaved ? "🎉 อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกสำเร็จ!", "success");
               switchTab('crm'); 
             } else { showToast("❌ " + response.message, "error"); }
           }).withFailureHandler(function(error) {
-            btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+            btn.disabled = false; btnText.innerText = target.isSaved ? 'อัปเดตข้อมูล' : 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
             showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error");
           }).saveTargetToCRM(formData);
       } else {
         // Simulation Mode
         setTimeout(() => {
-          btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
-          target.companyName = formData.companyName || 'ไม่มีชื่อ'; target.isSaved = true;
+          btn.disabled = false; btnText.innerText = target.isSaved ? 'อัปเดตข้อมูล' : 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+          
+          const isUpdate = target.isSaved; // เช็คก่อนว่าเป็นการอัปเดตหรือบันทึกใหม่
+          applyDataToTargetLocally();
+          
           target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
           isTargetPending = false; updateSidebarList(); closeCRMModal(); saveStateToLocal();
-          showToast("🎉 บันทึกสำเร็จ!", "success");
+          showToast(isUpdate ? "🎉 อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกสำเร็จ!", "success");
           switchTab('crm'); 
         }, 1200);
       }
