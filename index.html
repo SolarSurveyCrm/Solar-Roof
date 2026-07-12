@@ -10,14 +10,13 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- เปลี่ยน Font เป็น Noto Sans Thai ตามโจทย์ -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin=""/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <style>
-    /* ตั้งค่า Font และความคมชัด 4K (Anti-aliasing) */
+    /* ตั้งค่า Font และความคมชัด (Anti-aliasing) */
     html, body { 
       height: 100vh; width: 100vw; margin: 0; padding: 0; overflow: hidden; 
       font-family: 'Noto Sans Thai', sans-serif;
@@ -30,6 +29,12 @@
       height: 100vh !important; width: 100vw !important;
       position: fixed !important; top: 0; bottom: 0; left: 0; right: 0;
       z-index: 10; background-color: #cbd5e1; 
+    }
+    
+    /* แก้ปัญหารอยต่อแผนที่เวลาซูมในบาง Browser */
+    .leaflet-tile-container img {
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
     }
     
     /* 4K Glassmorphism Effect */
@@ -49,7 +54,6 @@
       position: absolute; z-index: 99999 !important; max-height: 250px; overflow-y: auto;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
-
     /* Animation สำหรับหมุดศูนย์กลาง */
     .center-ping-icon { position: relative; }
     .center-ping-icon::after {
@@ -59,7 +63,7 @@
     }
     @keyframes center-pulse { 0% { transform: scale(0.2); opacity: 0.8; } 100% { transform: scale(2.2); opacity: 0; } }
     
-    /* Leaflet Popup Styling - Sharp 4K look */
+    /* Leaflet Popup Styling */
     .leaflet-popup-content-wrapper { border-radius: 16px; padding: 4px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid rgba(226, 232, 240, 0.8); }
     .leaflet-popup-close-button { margin-top: 10px !important; margin-right: 10px !important; color: #64748b !important; }
     
@@ -70,8 +74,7 @@
       flex-direction: column;
       z-index: 1000;
     }
-
-    /* ระบบ ย่อ/ขยาย แบบ CSS Grid (สมูทมาก) */
+    /* ระบบ ย่อ/ขยาย แบบ CSS Grid */
     .collapsible-wrapper {
       display: grid;
       grid-template-rows: 1fr;
@@ -81,29 +84,26 @@
       grid-template-rows: 0fr;
     }
     .collapsible-content {
-      min-height: 0; /* สำคัญสำหรับ Grid Animation */
+      min-height: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-
     .dark-header {
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       transition: border-radius 0.4s ease;
     }
-
     /* Desktop View */
     @media (min-width: 768px) {
       .main-panel { 
-        width: 420px; /* ขยายความกว้างสำหรับ 4K */
+        width: 420px; 
         max-height: calc(100vh - 48px); 
         top: 24px; left: 24px; 
         border-radius: 1.5rem; 
       }
       .dark-header { border-radius: 1.5rem 1.5rem 0 0; }
-      .main-panel.is-collapsed .dark-header { border-radius: 1.5rem; } /* โค้งมนทุกมุมเมื่อย่อเก็บบน PC */
+      .main-panel.is-collapsed .dark-header { border-radius: 1.5rem; }
     }
-
     /* Mobile View */
     @media (max-width: 767px) {
       .main-panel { 
@@ -119,8 +119,7 @@
     .search-box-content { transition: all 0.3s ease-in-out; transform-origin: top; }
     .search-box-hidden { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0 !important; }
     .search-box-visible { max-height: 500px; opacity: 1; overflow: visible; }
-
-    /* Custom Scrollbar สำหรับ List ภายใน Panel */
+    /* Custom Scrollbar */
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 10px; }
@@ -146,11 +145,10 @@
         </div>
       </div>
       <button onclick="toggleMainPanel()" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/80 hover:bg-slate-700 transition border border-slate-600/50 cursor-pointer pointer-events-auto">
-        <!-- Icon ชี้ขึ้น หมายถึงเนื้อหาอยู่ด้านล่างพร้อมให้ย่อเก็บ -->
         <i id="mainChevron" class="fa-solid fa-chevron-up text-sm transition-transform duration-400"></i>
       </button>
     </div>
-
+    
     <!-- Collapsible Wrapper -->
     <div id="panelContentWrapper" class="collapsible-wrapper">
       <div class="collapsible-content">
@@ -215,7 +213,7 @@
                 </div>
               </div>
             </div>
-
+            
             <!-- รายการเป้าหมายที่รอการประเมิน (Pending) -->
             <div class="pt-1">
               <div class="flex items-center justify-between mb-3">
@@ -256,7 +254,7 @@
                 </div>
               </div>
             </div>
-
+            
             <div class="pt-1">
               <div class="flex items-center justify-between mb-3">
                 <h2 class="text-[13px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
@@ -284,8 +282,8 @@
       </div>
     </div>
   </div>
-
-  <!-- กล่องบันทึกข้อมูล CRM Modal (Premium UI) -->
+  
+  <!-- กล่องบันทึกข้อมูล CRM Modal -->
   <div id="crmModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[10000] flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-white/20 transform scale-95 opacity-0 transition-all duration-300">
       
@@ -358,13 +356,13 @@
       </form>
     </div>
   </div>
-
-  <!-- ระบบ Custom Toast Notification (Premium UI) -->
+  
+  <!-- ระบบ Custom Toast Notification -->
   <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center space-x-3 border border-slate-700/50 transform translate-y-[-120px] opacity-0 transition-all duration-400 z-[999999]">
     <div id="toast-icon" class="text-amber-400"><i class="fa-solid fa-info-circle text-lg"></i></div>
     <span id="toast-message" class="text-[13px] font-bold tracking-wide">แจ้งเตือนระบบ</span>
   </div>
-
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
   
   <script>
@@ -377,10 +375,11 @@
     let currentTargetIdForCRM = null;
     let isTargetPending = false; 
     let searchDebounceTimer;
-    let isPanelCollapsed = false; // State สำหรับระบบย่อ/ขยาย
-
+    let isPanelCollapsed = false;
+    
     const LOCAL_STORAGE_TARGETS_KEY = 'solarSurveyCRM_Targets_v2';
     const LOCAL_STORAGE_CENTER_KEY = 'solarSurveyCRM_Center_v2';
+    
     const provinceCoordinates = {
       "สมุทรปราการ": { lat: 13.5991, lng: 100.5968 },
       "กรุงเทพมหานคร": { lat: 13.7563, lng: 100.5018 },
@@ -412,18 +411,14 @@
         crmContent.classList.remove('hidden');
         exploreContent.classList.add('hidden');
       }
-      
-      // ถ้าเปิด Tab ใหม่แต่ Panel ถูกซ่อนอยู่ ให้บังคับเปิด
       if(isPanelCollapsed) toggleMainPanel();
     }
 
-    // ฟังก์ชันจัดการระบบ ย่อ/ขยาย (Expand/Collapse) หลัก
     function toggleMainPanel() {
       isPanelCollapsed = !isPanelCollapsed;
       const wrapper = document.getElementById('panelContentWrapper');
       const chevron = document.getElementById('mainChevron');
       const panel = document.getElementById('mainPanel');
-
       if (isPanelCollapsed) {
         wrapper.classList.add('collapsed');
         chevron.classList.add('rotate-180');
@@ -494,11 +489,8 @@
       setupSearch();
       setupProvinceSelect();
       loadStateFromLocal();
-      
-      // ทำให้ Panel หลักสามารถลากไปมาได้
       makeDraggable(document.getElementById('mainPanel'), document.getElementById('mainPanelHeader'));
       
-      // Responsive Map Fix
       if (typeof ResizeObserver !== 'undefined') {
         const resizeObserver = new ResizeObserver(() => { if (map) map.invalidateSize(); });
         resizeObserver.observe(document.getElementById('map'));
@@ -506,20 +498,17 @@
       setTimeout(() => { map.invalidateSize(); }, 500);
     };
 
-    // ฟังก์ชันสำหรับลากหน้าต่าง Panel
     function makeDraggable(element, handle) {
       let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
       let isDragging = false;
       let moved = false;
-
       handle.onmousedown = dragMouseDown;
       handle.ontouchstart = dragMouseDown;
-
+      
       function dragMouseDown(e) {
-        if (e.target.closest('button')) return; // ข้ามการลากถ้าคลิกปุ่ม
+        if (e.target.closest('button')) return;
         e = e || window.event;
         moved = false;
-
         if (e.type === 'touchstart') {
           pos3 = e.touches[0].clientX;
           pos4 = e.touches[0].clientY;
@@ -527,17 +516,14 @@
           pos3 = e.clientX;
           pos4 = e.clientY;
         }
-
         document.onmouseup = closeDragElement;
         document.ontouchend = closeDragElement;
         document.onmousemove = elementDrag;
         document.ontouchmove = elementDrag;
       }
-
       function elementDrag(e) {
         e = e || window.event;
         let clientX, clientY;
-
         if (e.type === 'touchmove') {
           clientX = e.touches[0].clientX;
           clientY = e.touches[0].clientY;
@@ -546,7 +532,6 @@
           clientX = e.clientX;
           clientY = e.clientY;
         }
-
         pos1 = pos3 - clientX;
         pos2 = pos4 - clientY;
         
@@ -554,20 +539,15 @@
           moved = true;
           isDragging = true;
         }
-
         if (isDragging) {
           pos3 = clientX;
           pos4 = clientY;
-          
           let newTop = element.offsetTop - pos2;
           let newLeft = element.offsetLeft - pos1;
-          
-          // ป้องกันไม่ให้ลากหลุดขอบจอ
           if (newTop < 0) newTop = 0;
           if (newLeft < 0) newLeft = 0;
           if (newTop > window.innerHeight - 60) newTop = window.innerHeight - 60;
           if (newLeft > window.innerWidth - 60) newLeft = window.innerWidth - 60;
-
           element.style.top = newTop + "px";
           element.style.left = newLeft + "px";
           element.style.bottom = "auto";
@@ -575,7 +555,6 @@
           element.style.transform = "none";
         }
       }
-
       function closeDragElement() {
         document.onmouseup = null;
         document.onmousemove = null;
@@ -583,23 +562,31 @@
         document.ontouchmove = null;
         setTimeout(() => { isDragging = false; }, 50);
       }
-      
-      // จัดการคลิกเพื่อย่อ/ขยาย ถ้าไม่ได้ลาก
       handle.onclick = function(e) {
         if (e.target.closest('button')) return;
-        if (!moved) {
-          toggleMainPanel();
-        }
+        if (!moved) { toggleMainPanel(); }
       };
     }
 
     function initMap() {
-      // detectRetina: true เพื่อ 4K Sharpness, maxZoom เป็น 22 (เทียบเท่า Google Map ลึกสุด)
-      map = L.map('map', { zoomControl: false, maxZoom: 22 }).setView([currentCenter.lat, currentCenter.lng], 14);
+      // ปรับ zoomSnap เพื่อความสมูทในการซูม
+      map = L.map('map', { 
+        zoomControl: false, 
+        maxZoom: 22,
+        zoomSnap: 0.1,
+        zoomDelta: 0.1
+      }).setView([currentCenter.lat, currentCenter.lng], 14);
+      
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       
-      L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=th&x={x}&y={y}&z={z}', {
-        maxZoom: 22, attribution: 'Map data &copy; Google Maps', detectRetina: true
+      // FIX: อัปเดต TileLayer สำหรับ 4K Text
+      // - เอา detectRetina ออก (เพราะทำให้ตัวหนังสือเล็กลงเมื่อ scale)
+      // - เพิ่ม &scale=2 เพื่อสั่งให้ Google ส่งภาพความละเอียดสูง (2x) มาให้แทน โดยตัวหนังสือจะรักษาสัดส่วนเดิม
+      // - เพิ่ม maxNativeZoom: 21 เพื่อป้องกันภาพหายเมื่อซูมทะลุระดับ 21
+      L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=th&x={x}&y={y}&z={z}&scale=2', {
+        maxZoom: 22, 
+        maxNativeZoom: 21,
+        attribution: 'Map data &copy; Google Maps'
       }).addTo(map);
       
       radiusCircle = L.circle([currentCenter.lat, currentCenter.lng], {
@@ -618,7 +605,7 @@
         if (isTargetPending) {
           showToast("กรุณาบันทึก CRM หรือยกเลิกเป้าหมายปัจจุบันก่อนเพิ่มจุดใหม่", "error");
           switchTab('explore'); 
-          if(isPanelCollapsed) toggleMainPanel(); // เปิดแผงมาให้ดูว่าติดอะไร
+          if(isPanelCollapsed) toggleMainPanel();
           return;
         }
         addSurveyTarget(e.latlng.lat, e.latlng.lng);
@@ -781,8 +768,7 @@
       if (isTargetPending) return;
       isTargetPending = true; 
       switchTab('explore'); 
-      if(isPanelCollapsed) toggleMainPanel(); // ขยายแผงขึ้นมาให้เห็นข้อมูล
-
+      if(isPanelCollapsed) toggleMainPanel(); 
       showToast("กำลังวิเคราะห์และจับพิกัดอาคาร...", "info");
       
       const geoData = await getAddressFromLatLng(clickLat, clickLng);
@@ -891,7 +877,6 @@
       const pendingTargets = targetMarkers.filter(t => !t.isSaved);
       const savedTargets = targetMarkers.filter(t => t.isSaved);
       
-      // --- อัปเดต Pending ---
       pendingCountLabel.innerText = pendingTargets.length;
       if (pendingTargets.length === 0) {
         pendingListContainer.innerHTML = `
@@ -904,8 +889,7 @@
       } else {
         pendingListContainer.innerHTML = pendingTargets.map(t => createListItemHTML(t, false)).join('');
       }
-
-      // --- อัปเดต Saved CRM ---
+      
       savedCountLabel.innerText = savedTargets.length;
       
       if (savedTargets.length > 0) {
@@ -939,13 +923,9 @@
     function flyToTarget(id) {
       const target = targetMarkers.find(t => t.id === id);
       if (target) {
-        // ใช้ map.getZoom() เพื่อให้แผนที่คงระยะซูมเดิมไว้ ไม่เด้งซูมออก
         map.flyTo([target.lat, target.lng], map.getZoom(), { animate: true, duration: 1.2 });
         target.marker.openPopup();
-        // ถ้าดูบนมือถือ ให้พับหน้าจออัตโนมัติเพื่อให้เห็นแผนที่เต็มๆ
-        if(window.innerWidth < 768 && !isPanelCollapsed) {
-          toggleMainPanel();
-        }
+        if(window.innerWidth < 768 && !isPanelCollapsed) { toggleMainPanel(); }
       }
     }
 
@@ -956,7 +936,6 @@
       document.getElementById('modalCoords').innerText = `${target.lat.toFixed(6)}, ${target.lng.toFixed(6)}`;
       document.getElementById('modalArea').innerText = `${target.roofArea.toFixed(1)} ตร.ม.`;
       
-      // ดึงข้อมูลเดิมมาแสดงหากเป็นการแก้ไข
       document.getElementById('crmCompanyName').value = target.companyName || '';
       document.getElementById('crmAddress').value = target.address || '';
       document.getElementById('crmContact').value = target.contactPerson || '';
@@ -967,7 +946,6 @@
       const modalTitle = document.getElementById('modalTitleText');
       const btnSubmitText = document.getElementById('btnSubmitCRM-Text');
       
-      // ปรับคำใน Modal ให้เหมาะสม (บันทึกใหม่ หรือ แก้ไข)
       if (target.isSaved) {
          modalTitle.innerText = "แก้ไขข้อมูลระบบ CRM";
          btnSubmitText.innerText = "อัปเดตข้อมูล";
@@ -1009,8 +987,7 @@
         lat: target.lat, lng: target.lng, roofArea: target.roofArea, contactPerson: document.getElementById('crmContact').value.trim(),
         phone: document.getElementById('crmPhone').value.trim(), status: document.getElementById('crmStatus').value, notes: document.getElementById('crmNotes').value.trim()
       };
-
-      // ฟังก์ชันสำหรับบันทึกข้อมูลลงตัวแปร Local
+      
       const applyDataToTargetLocally = () => {
         target.companyName = formData.companyName || 'ไม่มีชื่อ';
         target.address = formData.address || '-';
@@ -1020,7 +997,7 @@
         target.notes = formData.notes;
         target.isSaved = true;
       };
-
+      
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function(response) {
@@ -1037,11 +1014,10 @@
             showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error");
           }).saveTargetToCRM(formData);
       } else {
-        // Simulation Mode
         setTimeout(() => {
           btn.disabled = false; btnText.innerText = target.isSaved ? 'อัปเดตข้อมูล' : 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
           
-          const isUpdate = target.isSaved; // เช็คก่อนว่าเป็นการอัปเดตหรือบันทึกใหม่
+          const isUpdate = target.isSaved; 
           applyDataToTargetLocally();
           
           target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
@@ -1076,3 +1052,4 @@
   </script>
 </body>
 </html>
+
