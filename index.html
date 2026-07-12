@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบสำรวจเป้าหมายติดตั้ง Solar Roof</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- เปลี่ยน Font เป็น Noto Sans Thai ตามโจทย์ -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin=""/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* ตั้งค่า Font และความคมชัด 4K (Anti-aliasing) */
+    html, body { 
+      height: 100vh; width: 100vw; margin: 0; padding: 0; overflow: hidden; 
+      font-family: 'Noto Sans Thai', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #0f172a;
+    }
+    
+    #map {
+      height: 100vh !important; width: 100vw !important;
+      position: fixed !important; top: 0; bottom: 0; left: 0; right: 0;
+      z-index: 10; background-color: #cbd5e1; 
+    }
+    
+    /* 4K Glassmorphism Effect */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(20px); 
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    
+    .control-overlay { z-index: 1000; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    #search-dropdown {
+      position: absolute; z-index: 99999 !important; max-height: 250px; overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Animation สำหรับหมุดศูนย์กลาง */
+    .center-ping-icon { position: relative; }
+    .center-ping-icon::after {
+      content: ''; position: absolute; top: 50%; left: 50%; width: 36px; height: 36px;
+      margin-left: -18px; margin-top: -18px; border-radius: 50%;
+      background: rgba(239, 68, 68, 0.5); animation: center-pulse 1.8s infinite ease-out;
+    }
+    @keyframes center-pulse { 0% { transform: scale(0.2); opacity: 0.8; } 100% { transform: scale(2.2); opacity: 0; } }
+    
+    /* Leaflet Popup Styling - Sharp 4K look */
+    .leaflet-popup-content-wrapper { border-radius: 16px; padding: 4px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid rgba(226, 232, 240, 0.8); }
+    .leaflet-popup-close-button { margin-top: 10px !important; margin-right: 10px !important; color: #64748b !important; }
+    
+    /* Layout ของ Main Panel */
+    .main-panel {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+    }
+
+    /* ระบบ ย่อ/ขยาย แบบ CSS Grid (สมูทมาก) */
+    .collapsible-wrapper {
+      display: grid;
+      grid-template-rows: 1fr;
+      transition: grid-template-rows 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .collapsible-wrapper.collapsed {
+      grid-template-rows: 0fr;
+    }
+    .collapsible-content {
+      min-height: 0; /* สำคัญสำหรับ Grid Animation */
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .dark-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      transition: border-radius 0.4s ease;
+    }
+
+    /* Desktop View */
+    @media (min-width: 768px) {
+      .main-panel { 
+        width: 420px; /* ขยายความกว้างสำหรับ 4K */
+        max-height: calc(100vh - 48px); 
+        top: 24px; left: 24px; 
+        border-radius: 1.5rem; 
+      }
+      .dark-header { border-radius: 1.5rem 1.5rem 0 0; }
+      .main-panel.is-collapsed .dark-header { border-radius: 1.5rem; } /* โค้งมนทุกมุมเมื่อย่อเก็บบน PC */
+    }
+
+    /* Mobile View */
+    @media (max-width: 767px) {
+      .main-panel { 
+        width: 100%; 
+        max-height: 85vh; 
+        bottom: 0; left: 0; 
+        border-radius: 1.5rem 1.5rem 0 0; 
+      }
+      .dark-header { border-radius: 1.5rem 1.5rem 0 0; }
+    }
+    
+    /* Animation สำหรับ Search Box */
+    .search-box-content { transition: all 0.3s ease-in-out; transform-origin: top; }
+    .search-box-hidden { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0 !important; }
+    .search-box-visible { max-height: 250px; opacity: 1; overflow: visible; }
+
+    /* Custom Scrollbar สำหรับ List ภายใน Panel */
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.7); }
+  </style>
+</head>
+<body class="select-none antialiased text-slate-800">
+  
+  <!-- Map Container -->
+  <div id="map"></div>
+  
+  <div id="mainPanel" class="main-panel glass-panel">
+    
+    <!-- Header (Clickable for Expand/Collapse) -->
+    <div id="mainPanelHeader" class="dark-header p-4 flex items-center justify-between text-white cursor-move shadow-lg z-10">
+      <div class="flex items-center space-x-3 pointer-events-none">
+        <div class="bg-gradient-to-br from-amber-400 to-amber-600 text-slate-900 w-10 h-10 rounded-xl flex items-center justify-center shadow-md">
+          <i class="fa-solid fa-solar-panel text-xl"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-[17px] leading-tight tracking-wide drop-shadow-md">Solar Survey CRM</h1>
+          <p class="text-[11px] text-amber-300 font-medium">ระบบสำรวจ & จัดเก็บเป้าหมาย</p>
+        </div>
+      </div>
+      <button onclick="toggleMainPanel()" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/80 hover:bg-slate-700 transition border border-slate-600/50 cursor-pointer pointer-events-auto">
+        <!-- Icon ชี้ขึ้น หมายถึงเนื้อหาอยู่ด้านล่างพร้อมให้ย่อเก็บ -->
+        <i id="mainChevron" class="fa-solid fa-chevron-up text-sm transition-transform duration-400"></i>
+      </button>
+    </div>
+
+    <!-- Collapsible Wrapper -->
+    <div id="panelContentWrapper" class="collapsible-wrapper">
+      <div class="collapsible-content">
+        
+        <!-- ระบบ Tabs -->
+        <div class="flex border-b border-slate-200/80 bg-white/60 backdrop-blur-md">
+          <button onclick="switchTab('explore')" id="tab-btn-explore" class="flex-1 py-3.5 text-[13px] font-bold border-b-2 border-blue-600 text-blue-700 transition-colors bg-blue-50/50">
+            <i class="fa-solid fa-map-location-dot mr-1.5"></i> สำรวจ (Explore)
+          </button>
+          <button onclick="switchTab('crm')" id="tab-btn-crm" class="flex-1 py-3.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors relative">
+            <i class="fa-solid fa-folder-open mr-1.5"></i> ฐานข้อมูล CRM
+            <span id="crmTabBadge" class="absolute top-2.5 right-6 bg-amber-500 text-slate-900 text-[10px] px-1.5 py-0.5 rounded-full shadow-sm hidden font-extrabold">0</span>
+          </button>
+        </div>
+        
+        <div class="p-4 flex-1 overflow-y-auto no-scrollbar relative bg-white/40">
+          
+          <!-- ================================ -->
+          <!-- TAB 1: สำรวจ (Explore)           -->
+          <!-- ================================ -->
+          <div id="tab-content-explore" class="space-y-5">
+            
+            <!-- Toggle Search Box -->
+            <div class="bg-white/80 border border-slate-200/80 rounded-2xl p-3.5 shadow-sm backdrop-blur-sm">
+              <div class="flex items-center justify-between cursor-pointer" onclick="toggleSearchBox()">
+                <label class="text-[13px] font-bold text-slate-700 tracking-wide flex items-center">
+                  <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-2">
+                    <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                  </div>
+                  ค้นหาและตั้งจุดศูนย์กลาง
+                </label>
+                <i id="search-toggle-icon" class="fa-solid fa-chevron-up text-slate-400 transition-transform duration-300"></i>
+              </div>
+              
+              <div id="search-container" class="search-box-content search-box-visible mt-3.5 space-y-3 relative">
+                <div class="relative">
+                  <select id="provinceSelect" class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-3.5 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold appearance-none cursor-pointer transition-shadow hover:shadow-sm">
+                    <option value="สมุทรปราการ" selected>📍 จังหวัด: สมุทรปราการ</option>
+                    <option value="กรุงเทพมหานคร">📍 จังหวัด: กรุงเทพมหานคร</option>
+                    <option value="นนทบุรี">📍 จังหวัด: นนทบุรี</option>
+                    <option value="ปทุมธานี">📍 จังหวัด: ปทุมธานี</option>
+                    <option value="ชลบุรี">📍 จังหวัด: ชลบุรี</option>
+                    <option value="เชียงใหม่">📍 จังหวัด: เชียงใหม่</option>
+                    <option value="นครราชสีมา">📍 จังหวัด: นครราชสีมา</option>
+                    <option value="ภูเก็ต">📍 จังหวัด: ภูเก็ต</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
+                <div class="relative">
+                  <div class="relative group">
+                    <input type="text" id="searchInput" placeholder="พิมพ์ชื่อเป้าหมาย เช่น โลตัส, นิคม..." class="w-full bg-slate-50 border border-slate-200 text-slate-700 py-2.5 pl-10 pr-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400 transition-shadow hover:shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                      <i class="fa-solid fa-search text-[13px]"></i>
+                    </div>
+                    <div id="search-spinner" class="absolute inset-y-0 right-0 pr-3.5 flex items-center hidden">
+                      <i class="fa-solid fa-circle-notch fa-spin text-blue-500 text-sm"></i>
+                    </div>
+                  </div>
+                  <ul id="search-dropdown" class="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-100 rounded-xl shadow-2xl divide-y divide-slate-50 hidden backdrop-blur-xl bg-white/95"></ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- รายการเป้าหมายที่รอการประเมิน (Pending) -->
+            <div class="pt-1">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-[13px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                  <i class="fa-solid fa-clock-rotate-left mr-2"></i>กำลังประเมิน 
+                </h2>
+                <span id="pendingCount" class="bg-slate-200 text-slate-700 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold shadow-inner">0</span>
+              </div>
+              <div id="pendingList" class="space-y-2.5 max-h-[42vh] overflow-y-auto custom-scrollbar pr-1.5 pb-2">
+                <div class="text-center py-8 text-slate-400 bg-white/60 rounded-2xl border-2 border-dashed border-slate-200 backdrop-blur-sm">
+                  <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+                    <i class="fa-solid fa-map-pin text-xl text-slate-300"></i>
+                  </div>
+                  <span class="text-[13px] font-medium">คลิกบนแผนที่เพื่อเริ่มปักหมุดประเมิน</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- ================================ -->
+          <!-- TAB 2: ฐานข้อมูล CRM (Saved)     -->
+          <!-- ================================ -->
+          <div id="tab-content-crm" class="space-y-5 hidden">
+            
+            <div class="grid grid-cols-2 gap-3 mb-2">
+              <div class="bg-gradient-to-br from-blue-50 to-blue-100/50 p-3.5 rounded-2xl border border-blue-200/60 flex items-center space-x-3 shadow-sm">
+                <div class="bg-blue-100 p-2 rounded-lg text-blue-600"><i class="fa-solid fa-bolt text-lg"></i></div>
+                <div>
+                  <p class="text-[11px] text-blue-600 font-semibold uppercase tracking-wider">รวมกำลังผลิต</p>
+                  <p id="totalKwp" class="text-[15px] font-extrabold text-slate-800">0.00 kWp</p>
+                </div>
+              </div>
+              <div class="bg-gradient-to-br from-amber-50 to-amber-100/50 p-3.5 rounded-2xl border border-amber-200/60 flex items-center space-x-3 shadow-sm">
+                <div class="bg-amber-100 p-2 rounded-lg text-amber-600"><i class="fa-solid fa-sack-dollar text-lg"></i></div>
+                <div>
+                  <p class="text-[11px] text-amber-600 font-semibold uppercase tracking-wider">งบลงทุนรวม</p>
+                  <p id="totalBudget" class="text-[15px] font-extrabold text-slate-800">0.00 M฿</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-1">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-[13px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                  <i class="fa-solid fa-server mr-2"></i>บันทึกแล้ว (CRM)
+                </h2>
+                <span id="savedCount" class="bg-emerald-100 text-emerald-700 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold shadow-inner">0</span>
+              </div>
+              <div id="savedList" class="space-y-2.5 pb-4 max-h-[42vh] overflow-y-auto custom-scrollbar pr-1.5">
+                <div class="text-center py-10 text-slate-400 bg-white/60 rounded-2xl border-2 border-dashed border-slate-200 backdrop-blur-sm">
+                  <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+                    <i class="fa-solid fa-folder-open text-xl text-slate-300"></i>
+                  </div>
+                  <span class="text-[13px] font-medium">ยังไม่มีข้อมูลใน CRM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="p-3.5 bg-slate-50/90 border-t border-slate-200/80 text-[11px] font-medium text-slate-400 flex items-center justify-between backdrop-blur-md">
+          <span>Map Source: Google Hybrid 4K</span>
+          <span class="flex items-center text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><i class="fa-solid fa-cloud-arrow-up mr-1.5 animate-pulse"></i> Auto-Saved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- กล่องบันทึกข้อมูล CRM Modal (Premium UI) -->
+  <div id="crmModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[10000] flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-white/20 transform scale-95 opacity-0 transition-all duration-300">
+      
+      <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="bg-white/10 p-1.5 rounded-lg"><i class="fa-solid fa-floppy-disk text-amber-400"></i></div>
+          <h3 class="font-bold text-[15px] tracking-wide">บันทึกข้อมูลเข้าฐานระบบ CRM</h3>
+        </div>
+        <button type="button" class="text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center" onclick="closeCRMModal()">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      
+      <form id="crmForm" class="p-6 space-y-4 max-h-[75vh] overflow-y-auto no-scrollbar" onsubmit="submitCRMData(event)">
+        
+        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
+          <div>
+            <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider mb-0.5">พิกัดละติจูด/ลองจิจูด</span>
+            <span id="modalCoords" class="text-[13px] font-extrabold text-slate-700 font-mono">0.00, 0.00</span>
+          </div>
+          <div>
+            <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider mb-0.5">พื้นที่หลังคาโดยประมาณ</span>
+            <span id="modalArea" class="text-[13px] font-extrabold text-amber-600">0.00 ตร.ม.</span>
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-[13px] font-bold text-slate-700 mb-1.5">ชื่อเป้าหมาย / ชื่อบริษัท</label>
+          <input type="text" id="crmCompanyName" placeholder="ไม่ได้ระบุชื่อ" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow">
+        </div>
+        <div>
+          <label class="block text-[13px] font-bold text-slate-700 mb-1.5">ที่อยู่เป้าหมายจากการค้นหาและพิกัดแผนที่</label>
+          <textarea id="crmAddress" rows="2" placeholder="ไม่ได้ระบุที่อยู่" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow"></textarea>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[13px] font-bold text-slate-700 mb-1.5">ชื่อผู้ติดต่อที่สนใจ</label>
+            <input type="text" id="crmContact" placeholder="ไม่ต้องระบุก็ได้" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow">
+          </div>
+          <div>
+            <label class="block text-[13px] font-bold text-slate-700 mb-1.5">เบอร์โทรศัพท์ติดต่อ</label>
+            <input type="tel" id="crmPhone" placeholder="ไม่ต้องระบุก็ได้" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[13px] font-bold text-slate-700 mb-1.5">สถานะผู้มุ่งหวัง</label>
+            <select id="crmStatus" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow font-medium">
+              <option value="Lead-สนใจขั้นต้น">Lead-สนใจขั้นต้น</option>
+              <option value="Survey-กำลังส่งเข้าสำรวจจริง">Survey-กำลังส่งเข้าสำรวจจริง</option>
+              <option value="Proposal-เตรียมเสนอราคา">Proposal-เตรียมเสนอราคา</option>
+              <option value="Rejected-ยกเลิก">Rejected-ยกเลิก</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[13px] font-bold text-slate-700 mb-1.5">หมายเหตุเพิ่มเติม</label>
+            <input type="text" id="crmNotes" placeholder="ไม่ต้องระบุก็ได้" class="w-full bg-white border border-slate-200 text-slate-800 py-2.5 px-4 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm transition-shadow">
+          </div>
+        </div>
+        
+        <div class="flex space-x-3 pt-5 mt-2 border-t border-slate-100 justify-end">
+          <button type="button" onclick="closeCRMModal()" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-[13px] font-bold hover:bg-slate-200 transition-colors">พับเก็บ</button>
+          <button id="btnSubmitCRM" type="submit" class="bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-900 px-6 py-2.5 rounded-xl text-[13px] font-extrabold flex items-center space-x-2 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+            <span id="btnSubmitCRM-Text">บันทึกเข้าฐานข้อมูล</span>
+            <i id="btnSubmitCRM-Spinner" class="fa-solid fa-circle-notch fa-spin text-sm hidden"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ระบบ Custom Toast Notification (Premium UI) -->
+  <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center space-x-3 border border-slate-700/50 transform translate-y-[-120px] opacity-0 transition-all duration-400 z-[999999]">
+    <div id="toast-icon" class="text-amber-400"><i class="fa-solid fa-info-circle text-lg"></i></div>
+    <span id="toast-message" class="text-[13px] font-bold tracking-wide">แจ้งเตือนระบบ</span>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
+  
+  <script>
+    // ==========================================
+    // ตัวแปรและ State ทั้งหมดของระบบ
+    // ==========================================
+    let map, centerMarker, radiusCircle;
+    let currentCenter = { lat: 13.5991, lng: 100.5968, name: "สมุทรปราการ" }; 
+    let targetMarkers = [];
+    let currentTargetIdForCRM = null;
+    let isTargetPending = false; 
+    let searchDebounceTimer;
+    let isPanelCollapsed = false; // State สำหรับระบบย่อ/ขยาย
+
+    const LOCAL_STORAGE_TARGETS_KEY = 'solarSurveyCRM_Targets_v2';
+    const LOCAL_STORAGE_CENTER_KEY = 'solarSurveyCRM_Center_v2';
+    const provinceCoordinates = {
+      "สมุทรปราการ": { lat: 13.5991, lng: 100.5968 },
+      "กรุงเทพมหานคร": { lat: 13.7563, lng: 100.5018 },
+      "นนทบุรี": { lat: 13.8585, lng: 100.4852 },
+      "ปทุมธานี": { lat: 14.0135, lng: 100.5312 },
+      "ชลบุรี": { lat: 13.3611, lng: 100.9847 },
+      "เชียงใหม่": { lat: 18.7883, lng: 98.9853 },
+      "นครราชสีมา": { lat: 14.9799, lng: 102.0978 },
+      "ภูเก็ต": { lat: 7.8804, lng: 98.3922 }
+    };
+
+    // ==========================================
+    // ระบบ UI Navigation (Tabs & Collapse)
+    // ==========================================
+    function switchTab(tab) {
+      const exploreBtn = document.getElementById('tab-btn-explore');
+      const crmBtn = document.getElementById('tab-btn-crm');
+      const exploreContent = document.getElementById('tab-content-explore');
+      const crmContent = document.getElementById('tab-content-crm');
+      
+      if (tab === 'explore') {
+        exploreBtn.className = "flex-1 py-3.5 text-[13px] font-bold border-b-2 border-blue-600 text-blue-700 transition-colors bg-blue-50/50";
+        crmBtn.className = "flex-1 py-3.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors relative";
+        exploreContent.classList.remove('hidden');
+        crmContent.classList.add('hidden');
+      } else {
+        crmBtn.className = "flex-1 py-3.5 text-[13px] font-bold border-b-2 border-blue-600 text-blue-700 transition-colors bg-blue-50/50 relative";
+        exploreBtn.className = "flex-1 py-3.5 text-[13px] font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors";
+        crmContent.classList.remove('hidden');
+        exploreContent.classList.add('hidden');
+      }
+      
+      // ถ้าเปิด Tab ใหม่แต่ Panel ถูกซ่อนอยู่ ให้บังคับเปิด
+      if(isPanelCollapsed) toggleMainPanel();
+    }
+
+    // ฟังก์ชันจัดการระบบ ย่อ/ขยาย (Expand/Collapse) หลัก
+    function toggleMainPanel() {
+      isPanelCollapsed = !isPanelCollapsed;
+      const wrapper = document.getElementById('panelContentWrapper');
+      const chevron = document.getElementById('mainChevron');
+      const panel = document.getElementById('mainPanel');
+
+      if (isPanelCollapsed) {
+        wrapper.classList.add('collapsed');
+        chevron.classList.add('rotate-180');
+        panel.classList.add('is-collapsed');
+      } else {
+        wrapper.classList.remove('collapsed');
+        chevron.classList.remove('rotate-180');
+        panel.classList.remove('is-collapsed');
+      }
+    }
+
+    function toggleSearchBox() {
+      const container = document.getElementById('search-container');
+      const icon = document.getElementById('search-toggle-icon');
+      
+      if (container.classList.contains('search-box-visible')) {
+        container.classList.replace('search-box-visible', 'search-box-hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        container.classList.replace('search-box-hidden', 'search-box-visible');
+        icon.classList.remove('rotate-180');
+      }
+    }
+
+    // ==========================================
+    // ระบบกู้คืนและจดจำข้อมูล (Persistent Memory)
+    // ==========================================
+    function saveStateToLocal() {
+      localStorage.setItem(LOCAL_STORAGE_CENTER_KEY, JSON.stringify(currentCenter));
+      const dataToSave = targetMarkers.map(t => ({
+        id: t.id, lat: t.lat, lng: t.lng,
+        companyName: t.companyName, address: t.address,
+        roofArea: t.roofArea, isInsideRadius: t.isInsideRadius,
+        distance: t.distance, isSaved: t.isSaved, paybackYears: t.paybackYears
+      }));
+      localStorage.setItem(LOCAL_STORAGE_TARGETS_KEY, JSON.stringify(dataToSave));
+    }
+
+    function loadStateFromLocal() {
+      const savedCenter = localStorage.getItem(LOCAL_STORAGE_CENTER_KEY);
+      if (savedCenter) {
+        currentCenter = JSON.parse(savedCenter);
+        centerMarker.setLatLng([currentCenter.lat, currentCenter.lng]);
+        radiusCircle.setLatLng([currentCenter.lat, currentCenter.lng]);
+        map.setView([currentCenter.lat, currentCenter.lng], 14, { animate: false });
+      }
+      const savedTargets = localStorage.getItem(LOCAL_STORAGE_TARGETS_KEY);
+      if (savedTargets) {
+        const parsedTargets = JSON.parse(savedTargets);
+        parsedTargets.forEach(tData => {
+          const marker = L.marker([tData.lat, tData.lng], { icon: getBlueSolarIcon() }).addTo(map);
+          const restoredTarget = { ...tData, marker: marker };
+          targetMarkers.push(restoredTarget);
+          if (restoredTarget.isSaved) {
+            marker.bindPopup(getStep2HTML(restoredTarget), { closeOnClick: false, autoClose: false });
+          } else {
+            marker.bindPopup(getStep1HTML(restoredTarget), { closeOnClick: false, autoClose: false });
+          }
+        });
+        isTargetPending = targetMarkers.some(t => !t.isSaved);
+        updateSidebarList();
+      }
+    }
+
+    window.onload = function() {
+      initMap();
+      setupSearch();
+      setupProvinceSelect();
+      loadStateFromLocal();
+      
+      // ทำให้ Panel หลักสามารถลากไปมาได้
+      makeDraggable(document.getElementById('mainPanel'), document.getElementById('mainPanelHeader'));
+      
+      // Responsive Map Fix
+      if (typeof ResizeObserver !== 'undefined') {
+        const resizeObserver = new ResizeObserver(() => { if (map) map.invalidateSize(); });
+        resizeObserver.observe(document.getElementById('map'));
+      }
+      setTimeout(() => { map.invalidateSize(); }, 500);
+    };
+
+    // ฟังก์ชันสำหรับลากหน้าต่าง Panel
+    function makeDraggable(element, handle) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      let isDragging = false;
+      let moved = false;
+
+      handle.onmousedown = dragMouseDown;
+      handle.ontouchstart = dragMouseDown;
+
+      function dragMouseDown(e) {
+        if (e.target.closest('button')) return; // ข้ามการลากถ้าคลิกปุ่ม
+        e = e || window.event;
+        moved = false;
+
+        if (e.type === 'touchstart') {
+          pos3 = e.touches[0].clientX;
+          pos4 = e.touches[0].clientY;
+        } else {
+          pos3 = e.clientX;
+          pos4 = e.clientY;
+        }
+
+        document.onmouseup = closeDragElement;
+        document.ontouchend = closeDragElement;
+        document.onmousemove = elementDrag;
+        document.ontouchmove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        let clientX, clientY;
+
+        if (e.type === 'touchmove') {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          e.preventDefault(); 
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+
+        pos1 = pos3 - clientX;
+        pos2 = pos4 - clientY;
+        
+        if (Math.abs(pos1) > 2 || Math.abs(pos2) > 2) {
+          moved = true;
+          isDragging = true;
+        }
+
+        if (isDragging) {
+          pos3 = clientX;
+          pos4 = clientY;
+          
+          let newTop = element.offsetTop - pos2;
+          let newLeft = element.offsetLeft - pos1;
+          
+          // ป้องกันไม่ให้ลากหลุดขอบจอ
+          if (newTop < 0) newTop = 0;
+          if (newLeft < 0) newLeft = 0;
+          if (newTop > window.innerHeight - 60) newTop = window.innerHeight - 60;
+          if (newLeft > window.innerWidth - 60) newLeft = window.innerWidth - 60;
+
+          element.style.top = newTop + "px";
+          element.style.left = newLeft + "px";
+          element.style.bottom = "auto";
+          element.style.right = "auto";
+          element.style.transform = "none";
+        }
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        document.ontouchend = null;
+        document.ontouchmove = null;
+        setTimeout(() => { isDragging = false; }, 50);
+      }
+      
+      // จัดการคลิกเพื่อย่อ/ขยาย ถ้าไม่ได้ลาก
+      handle.onclick = function(e) {
+        if (e.target.closest('button')) return;
+        if (!moved) {
+          toggleMainPanel();
+        }
+      };
+    }
+
+    function initMap() {
+      // detectRetina: true เพื่อ 4K Sharpness, maxZoom เป็น 22 (เทียบเท่า Google Map ลึกสุด)
+      map = L.map('map', { zoomControl: false, maxZoom: 22 }).setView([currentCenter.lat, currentCenter.lng], 14);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      
+      L.tileLayer('https://mt1.google.com/vt/lyrs=y&hl=th&x={x}&y={y}&z={z}', {
+        maxZoom: 22, attribution: 'Map data &copy; Google Maps', detectRetina: true
+      }).addTo(map);
+      
+      radiusCircle = L.circle([currentCenter.lat, currentCenter.lng], {
+        radius: 1000, color: '#ef4444', weight: 1.5, fillColor: '#ef4444', fillOpacity: 0.08, dashArray: '5, 5'
+      }).addTo(map);
+      
+      const centerRedIcon = L.divIcon({
+        className: 'center-ping-icon',
+        html: `<div class="w-5 h-5 bg-red-600 border-[3px] border-white rounded-full shadow-[0_0_15px_rgba(220,38,38,0.8)]"></div>`,
+        iconSize: [20, 20], iconAnchor: [10, 10]
+      });
+      
+      centerMarker = L.marker([currentCenter.lat, currentCenter.lng], { icon: centerRedIcon, zIndexOffset: 1000 }).addTo(map);
+      
+      map.on('click', function(e) {
+        if (isTargetPending) {
+          showToast("กรุณาบันทึก CRM หรือยกเลิกเป้าหมายปัจจุบันก่อนเพิ่มจุดใหม่", "error");
+          switchTab('explore'); 
+          if(isPanelCollapsed) toggleMainPanel(); // เปิดแผงมาให้ดูว่าติดอะไร
+          return;
+        }
+        addSurveyTarget(e.latlng.lat, e.latlng.lng);
+      });
+    }
+
+    function setupProvinceSelect() {
+      const select = document.getElementById('provinceSelect');
+      select.addEventListener('change', function() {
+        const province = this.value;
+        const coords = provinceCoordinates[province];
+        if (coords) {
+          updateSearchCenter(coords.lat, coords.lng, `ศูนย์กลางการสำรวจจังหวัด${province}`);
+          showToast(`เปลี่ยนศูนย์กลางไปยัง จังหวัด${province}`, "success");
+        }
+      });
+    }
+
+    function updateSearchCenter(lat, lng, name) {
+      currentCenter = { lat, lng, name };
+      centerMarker.setLatLng([lat, lng]);
+      radiusCircle.setLatLng([lat, lng]);
+      map.flyTo([lat, lng], 14, { animate: true, duration: 1.5 });
+      saveStateToLocal();
+    }
+
+    function setupSearch() {
+      const searchInput = document.getElementById('searchInput');
+      const dropdown = document.getElementById('search-dropdown');
+      const spinner = document.getElementById('search-spinner');
+      
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchDebounceTimer);
+        const query = this.value.trim();
+        const province = document.getElementById('provinceSelect').value;
+        if (query.length < 3) { dropdown.classList.add('hidden'); return; }
+        
+        searchDebounceTimer = setTimeout(() => {
+          spinner.classList.remove('hidden');
+          const fullQuery = `${query} ${province} ประเทศไทย`;
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullQuery)}&limit=5&addressdetails=1&accept-language=th`;
+          
+          fetch(url).then(res => res.json()).then(data => {
+              spinner.classList.add('hidden');
+              dropdown.innerHTML = '';
+              if (data && data.length > 0) {
+                dropdown.classList.remove('hidden');
+                data.forEach(item => {
+                  const li = document.createElement('li');
+                  li.className = 'px-4 py-3 text-[13px] text-slate-700 hover:bg-slate-50 cursor-pointer flex flex-col space-y-1 transition-colors';
+                  const displayName = item.display_name.split(',')[0];
+                  li.innerHTML = `
+                    <div class="font-bold text-slate-900 flex items-center"><i class="fa-solid fa-location-dot text-red-500 mr-2 text-sm"></i>${displayName}</div>
+                    <div class="text-[11px] text-slate-500 truncate pl-5">${item.display_name}</div>
+                  `;
+                  li.addEventListener('click', () => {
+                    updateSearchCenter(parseFloat(item.lat), parseFloat(item.lon), displayName);
+                    searchInput.value = displayName;
+                    dropdown.classList.add('hidden');
+                  });
+                  dropdown.appendChild(li);
+                });
+              } else {
+                dropdown.innerHTML = `<li class="px-4 py-3 text-[13px] text-slate-400 italic text-center">ไม่พบสถานที่ระบุในพื้นที่นี้</li>`;
+                dropdown.classList.remove('hidden');
+              }
+            }).catch(err => { spinner.classList.add('hidden'); });
+        }, 400);
+      });
+      document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.add('hidden');
+      });
+    }
+
+    function getBlueSolarIcon() {
+      return L.divIcon({
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="absolute -top-7 bg-gradient-to-b from-blue-500 to-blue-700 text-white rounded-full p-2.5 shadow-xl border-2 border-white animate-bounce duration-300">
+              <i class="fa-solid fa-solar-panel text-sm drop-shadow-md"></i>
+            </div>
+            <div class="w-3 h-3 bg-blue-700 border-[2px] border-white rounded-full mt-4 shadow-[0_0_10px_rgba(29,78,216,0.6)]"></div>
+          </div>
+        `,
+        className: 'custom-solar-marker', iconSize: [32, 32], iconAnchor: [16, 16]
+      });
+    }
+
+    function getStep1HTML(target) {
+      const radiusBadge = target.isInsideRadius 
+        ? `<span class="bg-emerald-100/80 text-emerald-800 text-[11px] px-2 py-0.5 rounded-full font-bold border border-emerald-200"><i class="fa-solid fa-circle-check mr-1"></i>ในระยะ 1 กม.</span>`
+        : `<span class="bg-amber-100/80 text-amber-800 text-[11px] px-2 py-0.5 rounded-full font-bold border border-amber-200"><i class="fa-solid fa-triangle-exclamation mr-1"></i>นอกรัศมี ${(target.distance / 1000).toFixed(2)} กม.</span>`;
+      
+      return `
+        <div class="w-64 p-3 space-y-3.5 font-sans">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 class="font-bold text-[13px] text-slate-800 flex items-center"><i class="fa-solid fa-solar-panel text-blue-500 mr-2 text-base"></i>ตรวจพิกัดหลังคา</h4>
+            ${radiusBadge}
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">ชื่อสถานที่ (แก้ไขได้)</label>
+              <input type="text" id="pop-name-${target.id}" value="${target.companyName}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 py-1.5 px-3 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">ขนาดหลังคาโดยประมาณ (ตร.ม.)</label>
+              <input type="number" id="pop-area-${target.id}" value="${target.roofArea}" class="w-full bg-slate-50 border border-slate-200 text-slate-800 py-1.5 px-3 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-700">
+            </div>
+          </div>
+          <div class="flex items-center justify-between space-x-2 pt-2 border-t border-slate-100">
+            <button onclick="deleteTargetMarker('${target.id}')" class="text-[11px] text-red-500 hover:text-red-700 font-bold px-3 py-2 rounded-lg hover:bg-red-50 transition-colors flex items-center"><i class="fa-solid fa-trash mr-1.5"></i>ลบ</button>
+            <button onclick="confirmTargetStep2('${target.id}')" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-[12px] px-4 py-2 rounded-xl shadow-md transition-all flex items-center">
+              ขั้นต่อไป <i class="fa-solid fa-arrow-right ml-1.5"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getStep2HTML(target) {
+      const kwp = target.roofArea / 10;
+      const budget = kwp * 0.03;
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${target.lat},${target.lng}`;
+      
+      return `
+        <div class="w-64 p-3 space-y-3.5 font-sans">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 class="font-bold text-[13px] text-slate-800 flex items-center text-emerald-600"><i class="fa-solid fa-square-poll-horizontal mr-2 text-base"></i>ผลประเมินแผงโซลาร์</h4>
+            <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-emerald-200">SUCCESS</span>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100/80 text-[13px] space-y-2 shadow-sm">
+            <div class="text-[12px] font-extrabold text-slate-800 truncate border-b border-slate-200 pb-1.5 mb-1.5">${target.companyName}</div>
+            <div class="flex justify-between text-slate-600"><span class="font-medium">กำลังผลิตประเมิน:</span><strong class="text-blue-700">${kwp.toFixed(2)} kWp</strong></div>
+            <div class="flex justify-between text-slate-600"><span class="font-medium">งบลงทุนคาดการณ์:</span><strong class="text-slate-800">${budget.toFixed(2)} ล้านบาท</strong></div>
+            <div class="flex justify-between text-slate-600"><span class="font-medium">ระยะคืนทุนเฉลี่ย:</span><strong class="text-emerald-600">~ ${target.paybackYears} ปี</strong></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+             <a href="${mapsLink}" target="_blank" class="bg-blue-50 border border-blue-100 text-blue-700 hover:bg-blue-100 text-[11px] font-extrabold py-2 px-2 rounded-xl text-center flex items-center justify-center transition-colors"><i class="fa-solid fa-map-location-dot mr-1.5"></i>นำทาง</a>
+            <button onclick="openCRMModal('${target.id}')" class="bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-900 text-[11px] font-extrabold py-2 px-2 rounded-xl shadow-md text-center flex items-center justify-center transition-all"><i class="fa-solid fa-folder-plus mr-1.5"></i>บันทึก CRM</button>
+          </div>
+          <div class="text-center mt-1"><button onclick="deleteTargetMarker('${target.id}')" class="text-[11px] text-slate-400 hover:text-red-500 font-medium underline px-2 py-1 transition-colors">ลบหมุดเป้าหมายนี้</button></div>
+        </div>
+      `;
+    }
+
+    async function getAddressFromLatLng(lat, lng) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=th`);
+        const data = await res.json();
+        const isPOI = data.name && data.class !== 'highway' && data.class !== 'boundary';
+        let finalLat = lat, finalLng = lng, displayName = "หลังคา / พิกัดที่ระบุเอง";
+        if (isPOI) { finalLat = parseFloat(data.lat); finalLng = parseFloat(data.lon); displayName = data.name; }
+        return { displayName: displayName, fullAddress: data.display_name || `พิกัด: ${lat}, ${lng}`, snappedLat: finalLat, snappedLng: finalLng, isPOI: !!isPOI };
+      } catch (err) {
+        return { displayName: `พิกัดระบุเอง`, fullAddress: `พิกัด: ${lat}, ${lng}`, snappedLat: lat, snappedLng: lng, isPOI: false };
+      }
+    }
+
+    async function addSurveyTarget(clickLat, clickLng) {
+      if (isTargetPending) return;
+      isTargetPending = true; 
+      switchTab('explore'); 
+      if(isPanelCollapsed) toggleMainPanel(); // ขยายแผงขึ้นมาให้เห็นข้อมูล
+
+      showToast("กำลังวิเคราะห์และจับพิกัดอาคาร...", "info");
+      
+      const geoData = await getAddressFromLatLng(clickLat, clickLng);
+      const finalLat = geoData.snappedLat, finalLng = geoData.snappedLng;
+      
+      if (geoData.isPOI) showToast(`ล็อกเป้าหมายเข้ากับอาคาร: ${geoData.displayName}`, "success");
+      else showToast("ล็อกพิกัดจิ้มจริง (ข้ามถนน/ซอย)", "success");
+      
+      const centerLatLng = L.latLng(currentCenter.lat, currentCenter.lng);
+      const targetLatLng = L.latLng(finalLat, finalLng);
+      const distance = centerLatLng.distanceTo(targetLatLng);
+      const isInsideRadius = distance <= 1000;
+      const roofArea = Math.abs(Math.floor((Math.sin(finalLat) * Math.cos(finalLng) * 500) % 520) + 120);
+      
+      const markerId = 'temp-' + new Date().getTime();
+      const marker = L.marker([finalLat, finalLng], { icon: getBlueSolarIcon() }).addTo(map);
+      
+      map.flyTo([finalLat, finalLng], 16, { animate: true, duration: 0.8 });
+      
+      const newTarget = {
+        id: markerId, lat: finalLat, lng: finalLng, companyName: geoData.displayName, address: geoData.fullAddress,
+        roofArea: roofArea, isInsideRadius: isInsideRadius, distance: distance, marker: marker, isSaved: false, paybackYears: null 
+      };
+      
+      targetMarkers.push(newTarget);
+      marker.bindPopup(getStep1HTML(newTarget), { closeOnClick: false, autoClose: false }).openPopup();
+      
+      updateSidebarList();
+      saveStateToLocal();
+    }
+
+    function confirmTargetStep2(id) {
+      const target = targetMarkers.find(t => t.id === id);
+      if (!target) return;
+      target.companyName = document.getElementById(`pop-name-${id}`).value;
+      target.roofArea = parseFloat(document.getElementById(`pop-area-${id}`).value) || target.roofArea;
+      if (!target.paybackYears) target.paybackYears = (4.5 + Math.random() * 1.5).toFixed(1);
+      
+      target.marker.setPopupContent(getStep2HTML(target));
+      updateSidebarList();
+      saveStateToLocal();
+    }
+
+    function deleteTargetMarker(id) {
+      const index = targetMarkers.findIndex(t => t.id === id);
+      if (index !== -1) {
+        map.removeLayer(targetMarkers[index].marker);
+        if (!targetMarkers[index].isSaved) isTargetPending = false; 
+        targetMarkers.splice(index, 1);
+        updateSidebarList();
+        saveStateToLocal();
+        showToast("นำหมุดเป้าหมายออกเรียบร้อย", "info");
+      }
+    }
+
+    function createListItemHTML(target, isSaved) {
+      const kwp = target.roofArea / 10;
+      const budget = kwp * 0.03;
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${target.lat},${target.lng}`;
+      
+      const badgeHTML = isSaved 
+        ? `<span class="bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0"><i class="fa-solid fa-check mr-0.5"></i> SAVED</span>` 
+        : `<span class="bg-amber-100 border border-amber-200 text-amber-700 text-[10px] px-2 py-0.5 rounded-md font-extrabold ml-2 flex-shrink-0 animate-pulse">PENDING</span>`;
+      
+      return `
+        <div class="p-3.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl shadow-sm hover:shadow-md flex items-center justify-between cursor-pointer transition-all mb-3" onclick="flyToTarget('${target.id}')">
+          <div class="flex-1 min-w-0 pr-3">
+            <div class="text-[13px] font-bold text-slate-800 flex items-center mb-1"><span class="truncate">${target.companyName}</span> ${badgeHTML}</div>
+            <div class="flex items-center space-x-2.5 text-[11px] font-medium text-slate-500">
+              <span class="flex items-center"><i class="fa-solid fa-solar-panel text-blue-500 mr-1 text-[12px]"></i> ${kwp.toFixed(1)} kWp</span>
+              <span class="text-slate-300">•</span>
+              <span class="flex items-center"><i class="fa-solid fa-coins text-amber-500 mr-1 text-[12px]"></i> ${budget.toFixed(2)} M฿</span>
+            </div>
+          </div>
+          <div class="flex items-center space-x-1" onclick="event.stopPropagation();">
+            <a href="${mapsLink}" target="_blank" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors" title="เปิดนำทาง Google Maps"><i class="fa-solid fa-map-location-dot text-[15px]"></i></a>
+            <button onclick="deleteTargetMarker('${target.id}')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" title="ลบข้อมูล"><i class="fa-solid fa-trash-can text-[15px]"></i></button>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateSidebarList() {
+      const pendingListContainer = document.getElementById('pendingList');
+      const savedListContainer = document.getElementById('savedList');
+      const pendingCountLabel = document.getElementById('pendingCount');
+      const savedCountLabel = document.getElementById('savedCount');
+      const crmTabBadge = document.getElementById('crmTabBadge');
+      const totalKwpLabel = document.getElementById('totalKwp');
+      const totalBudgetLabel = document.getElementById('totalBudget');
+      
+      const pendingTargets = targetMarkers.filter(t => !t.isSaved);
+      const savedTargets = targetMarkers.filter(t => t.isSaved);
+      
+      // --- อัปเดต Pending ---
+      pendingCountLabel.innerText = pendingTargets.length;
+      if (pendingTargets.length === 0) {
+        pendingListContainer.innerHTML = `
+          <div class="text-center py-8 text-slate-400 bg-white/60 rounded-2xl border-2 border-dashed border-slate-200 backdrop-blur-sm">
+            <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+              <i class="fa-solid fa-map-pin text-xl text-slate-300"></i>
+            </div>
+            <span class="text-[13px] font-medium">คลิกบนพื้นที่เป้าหมายบนแผนที่เพื่อเริ่มประเมิน</span>
+          </div>`;
+      } else {
+        pendingListContainer.innerHTML = pendingTargets.map(t => createListItemHTML(t, false)).join('');
+      }
+
+      // --- อัปเดต Saved CRM ---
+      savedCountLabel.innerText = savedTargets.length;
+      
+      if (savedTargets.length > 0) {
+        crmTabBadge.innerText = savedTargets.length;
+        crmTabBadge.classList.remove('hidden');
+      } else {
+        crmTabBadge.classList.add('hidden');
+      }
+      
+      let sumKwp = 0, sumBudget = 0;
+      if (savedTargets.length === 0) {
+        savedListContainer.innerHTML = `
+          <div class="text-center py-10 text-slate-400 bg-white/60 rounded-2xl border-2 border-dashed border-slate-200 backdrop-blur-sm">
+            <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 shadow-inner">
+              <i class="fa-solid fa-folder-open text-xl text-slate-300"></i>
+            </div>
+            <span class="text-[13px] font-medium">ยังไม่มีเป้าหมายที่ถูกบันทึกลงใน CRM</span>
+          </div>`;
+      } else {
+        savedListContainer.innerHTML = savedTargets.map(t => {
+          const kwp = t.roofArea / 10;
+          sumKwp += kwp;
+          sumBudget += (kwp * 0.03);
+          return createListItemHTML(t, true);
+        }).join('');
+      }
+      totalKwpLabel.innerText = `${sumKwp.toFixed(2)} kWp`;
+      totalBudgetLabel.innerText = `${sumBudget.toFixed(2)} M฿`;
+    }
+
+    function flyToTarget(id) {
+      const target = targetMarkers.find(t => t.id === id);
+      if (target) {
+        // ใช้ map.getZoom() เพื่อให้แผนที่คงระยะซูมเดิมไว้ ไม่เด้งซูมออก
+        map.flyTo([target.lat, target.lng], map.getZoom(), { animate: true, duration: 1.2 });
+        target.marker.openPopup();
+        // ถ้าดูบนมือถือ ให้พับหน้าจออัตโนมัติเพื่อให้เห็นแผนที่เต็มๆ
+        if(window.innerWidth < 768 && !isPanelCollapsed) {
+          toggleMainPanel();
+        }
+      }
+    }
+
+    function openCRMModal(id) {
+      const target = targetMarkers.find(t => t.id === id);
+      if (!target) return;
+      currentTargetIdForCRM = id;
+      document.getElementById('modalCoords').innerText = `${target.lat.toFixed(6)}, ${target.lng.toFixed(6)}`;
+      document.getElementById('modalArea').innerText = `${target.roofArea.toFixed(1)} ตร.ม.`;
+      document.getElementById('crmCompanyName').value = target.companyName || '';
+      document.getElementById('crmAddress').value = target.address || '';
+      document.getElementById('crmContact').value = '';
+      document.getElementById('crmPhone').value = '';
+      document.getElementById('crmNotes').value = '';
+      
+      const modal = document.getElementById('crmModal');
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.querySelector('.transform').classList.remove('scale-95', 'opacity-0');
+        modal.querySelector('.transform').classList.add('scale-100', 'opacity-100');
+      }, 50);
+    }
+
+    function closeCRMModal() {
+      const modal = document.getElementById('crmModal');
+      modal.querySelector('.transform').classList.remove('scale-100', 'opacity-100');
+      modal.querySelector('.transform').classList.add('scale-95', 'opacity-0');
+      setTimeout(() => { modal.classList.add('hidden'); }, 300);
+    }
+
+    function submitCRMData(event) {
+      event.preventDefault();
+      const btnText = document.getElementById('btnSubmitCRM-Text');
+      const btnSpinner = document.getElementById('btnSubmitCRM-Spinner');
+      const btn = document.getElementById('btnSubmitCRM');
+      
+      btn.disabled = true;
+      btnText.innerText = 'กำลังส่งข้อมูล...';
+      btnSpinner.classList.remove('hidden');
+      
+      const target = targetMarkers.find(t => t.id === currentTargetIdForCRM);
+      if (!target) return;
+      
+      const formData = {
+        companyName: document.getElementById('crmCompanyName').value.trim(), address: document.getElementById('crmAddress').value.trim(),
+        lat: target.lat, lng: target.lng, roofArea: target.roofArea, contactPerson: document.getElementById('crmContact').value.trim(),
+        phone: document.getElementById('crmPhone').value.trim(), status: document.getElementById('crmStatus').value, notes: document.getElementById('crmNotes').value.trim()
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(response) {
+            btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+            if (response.success) {
+              target.companyName = formData.companyName || 'ไม่มีชื่อ'; target.address = formData.address || '-';
+              target.isSaved = true; target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
+              isTargetPending = false; updateSidebarList(); closeCRMModal(); saveStateToLocal();
+              showToast("🎉 บันทึกสำเร็จ!", "success");
+              switchTab('crm'); 
+            } else { showToast("❌ " + response.message, "error"); }
+          }).withFailureHandler(function(error) {
+            btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+            showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", "error");
+          }).saveTargetToCRM(formData);
+      } else {
+        // Simulation Mode
+        setTimeout(() => {
+          btn.disabled = false; btnText.innerText = 'บันทึกเข้าฐานข้อมูล'; btnSpinner.classList.add('hidden');
+          target.companyName = formData.companyName || 'ไม่มีชื่อ'; target.isSaved = true;
+          target.marker.closePopup(); target.marker.setPopupContent(getStep2HTML(target));
+          isTargetPending = false; updateSidebarList(); closeCRMModal(); saveStateToLocal();
+          showToast("🎉 บันทึกสำเร็จ!", "success");
+          switchTab('crm'); 
+        }, 1200);
+      }
+    }
+
+    function showToast(message, type = "info") {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      const toastIcon = document.getElementById('toast-icon');
+      
+      toastMsg.innerText = message;
+      
+      if (type === "success") {
+        toastIcon.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-xl animate-bounce"></i>`;
+        toast.className = "fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center space-x-3 border border-emerald-500/50 z-[999999] transition-all duration-400";
+      } else if (type === "error") {
+        toastIcon.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-400 text-xl"></i>`;
+        toast.className = "fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center space-x-3 border border-rose-500/50 z-[999999] transition-all duration-400";
+      } else if (type === "info") {
+        toastIcon.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-amber-400 text-xl"></i>`;
+        toast.className = "fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center space-x-3 border border-amber-500/50 z-[999999] transition-all duration-400";
+      }
+      
+      toast.style.transform = 'translate(-50%, 0)'; toast.style.opacity = '1';
+      setTimeout(() => { toast.style.transform = 'translate(-50%, -120px)'; toast.style.opacity = '0'; }, 4000);
+    }
+  </script>
+</body>
+</html>
